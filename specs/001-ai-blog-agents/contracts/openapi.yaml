@@ -1,0 +1,331 @@
+openapi: 3.0.3
+info:
+  title: Blog Agent API
+  version: 1.0.0
+  description: API وبلاگ با مدیریت مقاله و ایجنت‌های مستقل نویسنده و بازبین.
+servers:
+  - url: http://localhost:8080
+security: []
+tags:
+  - name: Public
+  - name: Admin
+paths:
+  /api/public/articles:
+    get:
+      tags: [Public]
+      summary: فهرست مقاله‌های منتشرشده
+      responses:
+        '200':
+          description: فقط مقاله‌های PUBLISHED
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ArticleSummary' }
+  /api/public/articles/{slug}:
+    get:
+      tags: [Public]
+      summary: دریافت مقاله منتشرشده با slug
+      parameters:
+        - $ref: '#/components/parameters/Slug'
+      responses:
+        '200':
+          description: مقاله منتشرشده
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicArticle' }
+        '404': { description: مقاله منتشرشده‌ای با این slug وجود ندارد }
+  /api/admin/articles/generate:
+    post:
+      tags: [Admin]
+      summary: تولید پیش‌نویس
+      security: [{ AdminBearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GenerateRequest' }
+      responses:
+        '201':
+          description: مقاله DRAFT نسخه ۱ ساخته شد
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminArticle' }
+        '400': { description: ورودی نامعتبر یا خروجی ایجنت نامعتبر }
+        '401': { description: توکن مدیر نامعتبر یا غایب }
+        '502': { description: خطای سرویس مدل }
+  /api/admin/articles:
+    get:
+      tags: [Admin]
+      summary: فهرست مقاله‌ها با وضعیت
+      security: [{ AdminBearer: [] }]
+      responses:
+        '200':
+          description: فهرست مدیریتی
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AdminArticle' }
+        '401': { description: توکن مدیر نامعتبر یا غایب }
+  /api/admin/articles/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ArticleId'
+    get:
+      tags: [Admin]
+      summary: جزئیات مدیریتی مقاله
+      security: [{ AdminBearer: [] }]
+      responses:
+        '200':
+          description: مقاله
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminArticle' }
+        '401': { description: توکن مدیر نامعتبر یا غایب }
+        '404': { description: مقاله یافت نشد }
+    put:
+      tags: [Admin]
+      summary: ویرایش محتوای مقاله و ایجاد نسخه تازه در صورت تغییر
+      security: [{ AdminBearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ArticleContent' }
+      responses:
+        '200':
+          description: مقاله و نسخه جاری به‌روزرسانی شدند
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminArticle' }
+        '400': { description: ورودی نامعتبر }
+        '401': { description: توکن مدیر نامعتبر یا غایب }
+        '404': { description: مقاله یافت نشد }
+        '409': { description: ویرایش مقاله منتشرشده مجاز نیست }
+  /api/admin/articles/{id}/revisions:
+    get:
+      tags: [Admin]
+      summary: تاریخچه snapshot نسخه‌ها
+      security: [{ AdminBearer: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ArticleId'
+      responses:
+        '200':
+          description: نسخه‌ها
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ArticleRevision' }
+        '401': { description: توکن مدیر نامعتبر یا غایب }
+        '404': { description: مقاله یافت نشد }
+  /api/admin/articles/{id}/review:
+    post:
+      tags: [Admin]
+      summary: درخواست بازبینی نسخه فعلی
+      security: [{ AdminBearer: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ArticleId'
+      responses:
+        '200':
+          description: گزارش بازبینی نسخه فعلی
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewReport' }
+        '401': { description: توکن مدیر نامعتبر یا غایب }
+        '404': { description: مقاله یافت نشد }
+        '409': { description: گذار وضعیت مجاز نیست }
+        '502': { description: خطای سرویس مدل یا گزارش نامعتبر }
+  /api/admin/articles/{id}/reviews:
+    get:
+      tags: [Admin]
+      summary: تاریخچه گزارش‌های بازبینی
+      security: [{ AdminBearer: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ArticleId'
+      responses:
+        '200':
+          description: گزارش‌ها
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ReviewReport' }
+        '401': { description: توکن مدیر نامعتبر یا غایب }
+        '404': { description: مقاله یافت نشد }
+  /api/admin/articles/{id}/revise:
+    post:
+      tags: [Admin]
+      summary: درخواست صریح اصلاح نسخه با بازخورد مدیر
+      security: [{ AdminBearer: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ArticleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [feedback]
+              properties:
+                feedback: { type: string, minLength: 1 }
+      responses:
+        '201':
+          description: نسخه تازه ساخته شد
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminArticle' }
+        '400': { description: بازخورد نامعتبر }
+        '401': { description: توکن مدیر نامعتبر یا غایب }
+        '404': { description: مقاله یافت نشد }
+        '409': { description: گذار وضعیت مجاز نیست }
+        '502': { description: خطای سرویس مدل یا خروجی نامعتبر }
+  /api/admin/articles/{id}/publish:
+    post:
+      tags: [Admin]
+      summary: انتشار دستی نسخه تأییدشده فعلی
+      security: [{ AdminBearer: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ArticleId'
+      responses:
+        '200':
+          description: مقاله منتشر شد
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminArticle' }
+        '401': { description: توکن مدیر نامعتبر یا غایب }
+        '404': { description: مقاله یافت نشد }
+        '409': { description: نسخه فعلی گزارش APPROVED معتبر ندارد }
+  /api/admin/articles/{id}/unpublish:
+    post:
+      tags: [Admin]
+      summary: لغو انتشار مقاله
+      security: [{ AdminBearer: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ArticleId'
+      responses:
+        '200':
+          description: انتشار لغو شد
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminArticle' }
+        '401': { description: توکن مدیر نامعتبر یا غایب }
+        '404': { description: مقاله یافت نشد }
+        '409': { description: مقاله منتشرشده نیست }
+components:
+  securitySchemes:
+    AdminBearer:
+      type: http
+      scheme: bearer
+      description: مقدار توکن از ADMIN_API_TOKEN محیط برنامه تنظیم می‌شود.
+  parameters:
+    ArticleId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Slug:
+      name: slug
+      in: path
+      required: true
+      schema: { type: string }
+  schemas:
+    GenerateRequest:
+      type: object
+      required: [topic]
+      properties:
+        topic: { type: string, minLength: 1 }
+        instructions: { type: string, nullable: true }
+    ArticleContent:
+      type: object
+      required: [title, excerpt, bodyMarkdown, tags]
+      properties:
+        title: { type: string, minLength: 1 }
+        excerpt: { type: string, minLength: 1 }
+        bodyMarkdown: { type: string, minLength: 1 }
+        tags:
+          type: array
+          items: { type: string }
+    ArticleSummary:
+      type: object
+      required: [id, slug, title, excerpt, tags]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        title: { type: string }
+        excerpt: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+    PublicArticle:
+      allOf:
+        - $ref: '#/components/schemas/ArticleSummary'
+        - type: object
+          required: [bodyMarkdown, publishedAt]
+          properties:
+            bodyMarkdown: { type: string, description: Markdown امن‌شده برای خروجی عمومی }
+            publishedAt: { type: string, format: date-time }
+    AdminArticle:
+      allOf:
+        - $ref: '#/components/schemas/ArticleContent'
+        - type: object
+          required: [id, slug, status, currentVersion, createdAt, updatedAt]
+          properties:
+            id: { type: string, format: uuid }
+            slug: { type: string }
+            status:
+              type: string
+              enum: [DRAFT, IN_REVIEW, NEEDS_CHANGES, APPROVED, PUBLISHED]
+            currentVersion: { type: integer, minimum: 1 }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+            publishedAt: { type: string, format: date-time, nullable: true }
+            mock: { type: boolean }
+    ArticleRevision:
+      allOf:
+        - $ref: '#/components/schemas/ArticleContent'
+        - type: object
+          required: [id, articleId, version, createdAt]
+          properties:
+            id: { type: string, format: uuid }
+            articleId: { type: string, format: uuid }
+            version: { type: integer, minimum: 1 }
+            createdAt: { type: string, format: date-time }
+            changeSource: { type: string, enum: [GENERATION, MANUAL, AGENT_REVISION] }
+    ReviewFinding:
+      type: object
+      required: [severity, location, issue, suggestion]
+      properties:
+        severity: { type: string, enum: [HIGH, MEDIUM, LOW] }
+        location: { type: string }
+        issue: { type: string }
+        suggestion: { type: string }
+    ReviewReport:
+      type: object
+      required: [id, articleId, reviewedVersion, verdict, score, strengths, findings, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        articleId: { type: string, format: uuid }
+        reviewedVersion: { type: integer, minimum: 1 }
+        verdict: { type: string, enum: [APPROVED, NEEDS_CHANGES] }
+        score: { type: integer, minimum: 0, maximum: 100 }
+        strengths:
+          type: array
+          items: { type: string }
+        findings:
+          type: array
+          items: { $ref: '#/components/schemas/ReviewFinding' }
+        createdAt: { type: string, format: date-time }
+        mock: { type: boolean }
+    AgentRun:
+      type: object
+      required: [id, agentType, outcome, durationMs, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        agentType: { type: string, enum: [WRITER, REVIEWER] }
+        articleId: { type: string, format: uuid, nullable: true }
+        inputVersion: { type: integer, nullable: true }
+        modelName: { type: string }
+        outcome: { type: string, enum: [SUCCESS, FAILURE] }
+        durationMs: { type: integer, minimum: 0 }
+        createdAt: { type: string, format: date-time }
